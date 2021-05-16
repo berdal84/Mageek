@@ -24,6 +24,23 @@ ENABLE_PAUSE            = true;        // set to false to disable all pause() ca
 ANALYSED_SUBFOLDER_NAME = "ANALYSED";  // will be created if not exists.
 FILE_EXTENSION          = ".czi";      // the script will only consider this extension.
 
+/*
+ * Color presets
+ *
+ * they will be sorted alphabetically.
+ * 
+ * Q: How to add a new one ?
+ * A: Copy an existing preset and replace the name and the colors (they must be separated by a space).
+ */
+List.set( "Confocal (Magenta Red Green Blue)", "Magenta Red Green Blue" );
+List.set( "Legacy   (Blue Green Red Magenta)", "Blue Green Red Magenta" );
+// List.set( "new preset", "Magenta Red Green Blue" );
+
+/* Colors */
+PRESET_COLOR_FALLBACK = "..."; // this will identify that user want's to use the color preset, this will be replaced.
+                               // Though the text will be visible in drop down list.
+COLORS = newArray( PRESET_COLOR_FALLBACK, "Blue", "Green", "Red", "Magenta" ); // Colors available through the color drop down list.
+
 /**
  * 1 - Create a startup dialog to explain to the user the following steps.
  */
@@ -124,6 +141,17 @@ Zchoice = newArray(
 	"Median",
 	"none");
 Dialog.addChoice("Z Project", Zchoice);
+Dialog.addMessage("");
+presetsKeys = newArray();
+presetsColors = newArray();
+List.toArrays(presetsKeys, presetsColors) ;
+Dialog.addChoice("Color preset", presetsKeys, presetsKeys[0] );
+Dialog.addMessage("Overrides:");
+Dialog.addChoice("  Channel 1", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addChoice("  Channel 2", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addChoice("  Channel 3", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addChoice("  Channel 4", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addMessage("");
 Dialog.addCheckbox("batch (process in background)", true);
 Dialog.addMessage("");
 Dialog.addMessage("Process the images " + filteredFiles.length + " files?");
@@ -131,7 +159,31 @@ Dialog.show();
 
 // Apply the choices
 zProjUserChoice  = Dialog.getChoice();
-batchModeUserChoice       = Dialog.getCheckbox();
+presetUserChoice = Dialog.getChoice();
+colorsUserChoice = newArray(
+	Dialog.getChoice(),
+	Dialog.getChoice(),
+	Dialog.getChoice(),
+	Dialog.getChoice()
+);
+
+// apply the preset colors for each color except if user set something different
+colorsAsString = List.get(presetUserChoice);
+colorsPreset = split( colorsAsString, " ");
+for (colorIndex = 0; colorIndex < colorsUserChoice.length; colorIndex++)
+{
+	if ( colorsUserChoice[colorIndex] == PRESET_COLOR_FALLBACK )
+	{
+		colorsUserChoice[colorIndex] = colorsPreset[colorIndex];
+	}
+}
+print( "Before user overrides, the selected preset colors are:");
+Array.print( colorsPreset );
+print( "After user overrides:");
+Array.print( colorsUserChoice );
+
+// batch mode on/off
+batchModeUserChoice = Dialog.getCheckbox();
 setBatchMode(batchModeUserChoice);
 
 /**
@@ -148,21 +200,7 @@ for (fileIndex = 0; fileIndex < filteredFiles.length; fileIndex++)
 	run("Bio-Formats Importer", "open='" + eachFilePath + "' autoscale=false view=Hyperstack");
 	name = File.nameWithoutExtension;	
 	getDimensions(width, height, channels, slices, frames);	
-	
-	// Depending on channel count save 1, 2, 3 or 4 images.	
-	colors = newArray("Blue");
-	
-	if (channels == 2){			
-		colors = newArray("Blue", "Green");
-		
-	} else if (channels == 3) {
-		colors = newArray("Blue", "Green", "Red");
-		
-	} else if (channels >= 4){
-		colors = newArray("Blue", "Green", "Red", "Magenta");
-	} 
-
-	Colorize(eachFilePath, colors);
+	Colorize(eachFilePath, colorsUserChoice );
 	
 	print("    DONE ! ");
 	
@@ -199,7 +237,11 @@ function Colorize(eachFilePath, _colorForChannel)
 	print("Colorize... ", eachFilePath);
 	print("     [", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
 	
-	count = _colorForChannel.length;	
+	count = channels;	
+	// in some cases we could have more channels than colors, so we skip the channels without color
+	if ( count  > _colorForChannel.length ) {
+		count = _colorForChannel.length;
+	}
 
 	// Stack.setDisplayMode("color");
 
@@ -243,7 +285,7 @@ function Colorize(eachFilePath, _colorForChannel)
 
 	// Create a Montage with N images
 	run("Images to Stack", "name=name title=[] use keep");
-	run("Make Montage...", "columns=" + count + " rows=1 scale=0.5 first=1 last="+count+" increment=1 border=1 font=12");
+	run("Make Montage...", "columns=" + count + " rows=1 scale=0.5 first=1 last="+ count +" increment=1 border=1 font=12");
 	saveAs("Tiff", outputFileName + "_Montage.tif");
 
 	// Close opened images
