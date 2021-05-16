@@ -124,6 +124,13 @@ Zchoice = newArray(
 	"Median",
 	"none");
 Dialog.addChoice("Z Project", Zchoice);
+
+availableColors = newArray( "Blue", "Green", "Red", "Magenta" );
+Dialog.addChoice("Channel 1", availableColors, availableColors[0] );
+Dialog.addChoice("Channel 2", availableColors, availableColors[1] );
+Dialog.addChoice("Channel 3", availableColors, availableColors[2] );
+Dialog.addChoice("Channel 4", availableColors, availableColors[3] );
+
 Dialog.addCheckbox("batch (process in background)", true);
 Dialog.addMessage("");
 Dialog.addMessage("Process the images " + filteredFiles.length + " files?");
@@ -131,6 +138,12 @@ Dialog.show();
 
 // Apply the choices
 zProjUserChoice  = Dialog.getChoice();
+colorsUserChoice = newArray(
+	Dialog.getChoice(),
+	Dialog.getChoice(),
+	Dialog.getChoice(),
+	Dialog.getChoice()
+);
 batchModeUserChoice       = Dialog.getCheckbox();
 setBatchMode(batchModeUserChoice);
 
@@ -148,21 +161,7 @@ for (fileIndex = 0; fileIndex < filteredFiles.length; fileIndex++)
 	run("Bio-Formats Importer", "open='" + eachFilePath + "' autoscale=false view=Hyperstack");
 	name = File.nameWithoutExtension;	
 	getDimensions(width, height, channels, slices, frames);	
-	
-	// Depending on channel count save 1, 2, 3 or 4 images.	
-	colors = newArray("Blue");
-	
-	if (channels == 2){			
-		colors = newArray("Blue", "Green");
-		
-	} else if (channels == 3) {
-		colors = newArray("Blue", "Green", "Red");
-		
-	} else if (channels >= 4){
-		colors = newArray("Blue", "Green", "Red", "Magenta");
-	} 
-
-	Colorize(eachFilePath, colors);
+	Colorize(eachFilePath, colorsUserChoice );
 	
 	print("    DONE ! ");
 	
@@ -199,7 +198,11 @@ function Colorize(eachFilePath, _colorForChannel)
 	print("Colorize... ", eachFilePath);
 	print("     [", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
 	
-	count = _colorForChannel.length;	
+	count = channels;	
+	// in some cases we could have more channels than colors, so we skip the channels without color
+	if ( count  > _colorForChannel.length ) {
+		count = _colorForChannel.length;
+	}
 
 	// Stack.setDisplayMode("color");
 
@@ -243,7 +246,7 @@ function Colorize(eachFilePath, _colorForChannel)
 
 	// Create a Montage with N images
 	run("Images to Stack", "name=name title=[] use keep");
-	run("Make Montage...", "columns=" + count + " rows=1 scale=0.5 first=1 last="+count+" increment=1 border=1 font=12");
+	run("Make Montage...", "columns=" + count + " rows=1 scale=0.5 first=1 last="+ count +" increment=1 border=1 font=12");
 	saveAs("Tiff", outputFileName + "_Montage.tif");
 
 	// Close opened images
