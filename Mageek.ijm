@@ -125,11 +125,27 @@ Zchoice = newArray(
 	"none");
 Dialog.addChoice("Z Project", Zchoice);
 
-availableColors = newArray( "Blue", "Green", "Red", "Magenta" );
-Dialog.addChoice("Channel 1", availableColors, availableColors[0] );
-Dialog.addChoice("Channel 2", availableColors, availableColors[1] );
-Dialog.addChoice("Channel 3", availableColors, availableColors[2] );
-Dialog.addChoice("Channel 4", availableColors, availableColors[3] );
+function getPreset( key )
+{
+	index = List.get( key );
+	if ( index == 0 ) return newArray("Blue", "Green", "Red", "Magenta");
+	if ( index == 1 ) return newArray("Magenta", "Red", "Green", "Blue");
+}
+
+List.set( "Legacy   (Blue Green Red Magenta)", 0 );
+List.set( "Confocal (Magenta Red Green Blue)", 1 ); 
+
+presetsKeys = newArray();
+presetsColors = newArray();
+List.toArrays(presetsKeys, presetsColors) ;
+Dialog.addChoice("Color preset", presetsKeys, presetsKeys[0] )
+
+presetColor = "preset";
+availableColors = newArray( presetColor, "Blue", "Green", "Red", "Magenta" );
+Dialog.addChoice("Channel 1", availableColors, presetColor );
+Dialog.addChoice("Channel 2", availableColors, presetColor );
+Dialog.addChoice("Channel 3", availableColors, presetColor );
+Dialog.addChoice("Channel 4", availableColors, presetColor );
 
 Dialog.addCheckbox("batch (process in background)", true);
 Dialog.addMessage("");
@@ -138,12 +154,25 @@ Dialog.show();
 
 // Apply the choices
 zProjUserChoice  = Dialog.getChoice();
+
+presetUserChoice  = Dialog.getChoice();
+
 colorsUserChoice = newArray(
 	Dialog.getChoice(),
 	Dialog.getChoice(),
 	Dialog.getChoice(),
 	Dialog.getChoice()
 );
+// replace "preset" by the actual preset value
+preset = getPreset( presetUserChoice );
+for (colorIndex = 0; colorIndex < colorsUserChoice.length; colorIndex++)
+{
+	if ( colorsUserChoice[colorIndex] == presetColor )
+	{
+		colorsUserChoice[colorIndex] = preset[colorIndex];
+	}
+}
+
 batchModeUserChoice       = Dialog.getCheckbox();
 setBatchMode(batchModeUserChoice);
 
