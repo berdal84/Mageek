@@ -24,6 +24,23 @@ ENABLE_PAUSE            = true;        // set to false to disable all pause() ca
 ANALYSED_SUBFOLDER_NAME = "ANALYSED";  // will be created if not exists.
 FILE_EXTENSION          = ".czi";      // the script will only consider this extension.
 
+/*
+ * Color presets
+ *
+ * they will be sorted alphabetically.
+ * 
+ * Q: How to add a new one ?
+ * A: Copy an existing preset and replace the name and the colors (they must be separated by a space).
+ */
+List.set( "Confocal (Magenta Red Green Blue)", "Magenta Red Green Blue" );
+List.set( "Legacy   (Blue Green Red Magenta)", "Blue Green Red Magenta" );
+// List.set( "new preset", "Magenta Red Green Blue" );
+
+/* Colors */
+PRESET_COLOR_FALLBACK = "..."; // this will identify that user want's to use the color preset, this will be replaced.
+                               // Though the text will be visible in drop down list.
+COLORS = newArray( PRESET_COLOR_FALLBACK, "Blue", "Green", "Red", "Magenta" ); // Colors available through the color drop down list.
+
 /**
  * 1 - Create a startup dialog to explain to the user the following steps.
  */
@@ -124,29 +141,17 @@ Zchoice = newArray(
 	"Median",
 	"none");
 Dialog.addChoice("Z Project", Zchoice);
-
-function getPreset( key )
-{
-	index = List.get( key );
-	if ( index == 0 ) return newArray("Blue", "Green", "Red", "Magenta");
-	if ( index == 1 ) return newArray("Magenta", "Red", "Green", "Blue");
-}
-
-List.set( "Legacy   (Blue Green Red Magenta)", 0 );
-List.set( "Confocal (Magenta Red Green Blue)", 1 ); 
-
+Dialog.addMessage("");
 presetsKeys = newArray();
 presetsColors = newArray();
 List.toArrays(presetsKeys, presetsColors) ;
-Dialog.addChoice("Color preset", presetsKeys, presetsKeys[0] )
-
-presetColor = "preset";
-availableColors = newArray( presetColor, "Blue", "Green", "Red", "Magenta" );
-Dialog.addChoice("Channel 1", availableColors, presetColor );
-Dialog.addChoice("Channel 2", availableColors, presetColor );
-Dialog.addChoice("Channel 3", availableColors, presetColor );
-Dialog.addChoice("Channel 4", availableColors, presetColor );
-
+Dialog.addChoice("Color preset", presetsKeys, presetsKeys[0] );
+Dialog.addMessage("Overrides:");
+Dialog.addChoice("  Channel 1", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addChoice("  Channel 2", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addChoice("  Channel 3", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addChoice("  Channel 4", COLORS, PRESET_COLOR_FALLBACK );
+Dialog.addMessage("");
 Dialog.addCheckbox("batch (process in background)", true);
 Dialog.addMessage("");
 Dialog.addMessage("Process the images " + filteredFiles.length + " files?");
@@ -154,26 +159,31 @@ Dialog.show();
 
 // Apply the choices
 zProjUserChoice  = Dialog.getChoice();
-
-presetUserChoice  = Dialog.getChoice();
-
+presetUserChoice = Dialog.getChoice();
 colorsUserChoice = newArray(
 	Dialog.getChoice(),
 	Dialog.getChoice(),
 	Dialog.getChoice(),
 	Dialog.getChoice()
 );
-// replace "preset" by the actual preset value
-preset = getPreset( presetUserChoice );
+
+// apply the preset colors for each color except if user set something different
+colorsAsString = List.get(presetUserChoice);
+colorsPreset = split( colorsAsString, " ");
 for (colorIndex = 0; colorIndex < colorsUserChoice.length; colorIndex++)
 {
-	if ( colorsUserChoice[colorIndex] == presetColor )
+	if ( colorsUserChoice[colorIndex] == PRESET_COLOR_FALLBACK )
 	{
-		colorsUserChoice[colorIndex] = preset[colorIndex];
+		colorsUserChoice[colorIndex] = colorsPreset[colorIndex];
 	}
 }
+print( "Before user overrides, the selected preset colors are:");
+Array.print( colorsPreset );
+print( "After user overrides:");
+Array.print( colorsUserChoice );
 
-batchModeUserChoice       = Dialog.getCheckbox();
+// batch mode on/off
+batchModeUserChoice = Dialog.getCheckbox();
 setBatchMode(batchModeUserChoice);
 
 /**
