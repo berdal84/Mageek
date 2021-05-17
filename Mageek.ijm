@@ -34,7 +34,7 @@ FILE_EXTENSION          = ".czi";      // the script will only consider this ext
  */
 List.set( "Confocal (Magenta Red Green Blue)", "Magenta Red Green Blue" );
 List.set( "Legacy   (Blue Green Red Magenta)", "Blue Green Red Magenta" );
-// List.set( "new preset", "Magenta Red Green Blue" );
+// List.set( "my preset", "Red Magenta Green Blue" );
 
 /* Colors */
 PRESET_COLOR_FALLBACK = "..."; // this will identify that user want's to use the color preset, this will be replaced.
@@ -237,16 +237,16 @@ function Colorize(eachFilePath, _colorForChannel)
 	print("Colorize... ", eachFilePath);
 	print("     [", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
 	
-	count = channels;	
+	channelToProcessCount = channels;	
 	// in some cases we could have more channels than colors, so we skip the channels without color
-	if ( count  > _colorForChannel.length ) {
-		count = _colorForChannel.length;
+	if ( channelToProcessCount  > _colorForChannel.length ) {
+		channelToProcessCount = _colorForChannel.length;
 	}
 
 	// Stack.setDisplayMode("color");
 
 	// Colorize each channels using specified color (_colorForChannel is an Array of strings)
-	for( i=0; i < count; i++) {
+	for( i=0; i < channelToProcessCount; i++) {
 		Stack.setChannel(i+1);
 		colorScriptName = _colorForChannel[i];
 		print("Colorizing channel ", i+1, " as ", colorScriptName, "...");
@@ -259,17 +259,20 @@ function Colorize(eachFilePath, _colorForChannel)
 		close();
 	}
 	
-	run("Split Channels");	
+	// Split channels if needed
+	if ( channelToProcessCount > 1 ) {
+		run("Split Channels");
+	}	
 	
-	// Rename the splitted images
-	for( i=0; i < count; i++) {
+	// Rename the channel(s) image(s)
+	for( i=0; i < channelToProcessCount; i++) {
 		selectImage(i+1);
 		rename(_colorForChannel[i]);
 	}
 
 	/** Merge channel is disabled for now...
 	options = "";
-	for( i=0; i < count; i++) {
+	for( i=0; i < channelToProcessCount; i++) {
 		options = options + "c"+(i+1)+"=" + _colorForChannel[i] + " ";
 	}
 	run("Merge Channels...", options + "keep");
@@ -277,16 +280,18 @@ function Colorize(eachFilePath, _colorForChannel)
 	
 	// Save each image
 	outputFileName = destinationDirectory + File.separator + name;
-	for( i=0; i < count; i++) {
+	for( i=0; i < channelToProcessCount; i++) {
 		selectWindow(_colorForChannel[i]);
 		run("RGB Color");
 		saveAs("Tiff", outputFileName + "_" + _colorForChannel[i] + ".tif");
 	}
 
-	// Create a Montage with N images
-	run("Images to Stack", "name=name title=[] use keep");
-	run("Make Montage...", "columns=" + count + " rows=1 scale=0.5 first=1 last="+ count +" increment=1 border=1 font=12");
-	saveAs("Tiff", outputFileName + "_Montage.tif");
+	// Create a Montage with colored channels (only if we have more than one channel)
+	if ( channelToProcessCount > 1 ) {
+		run("Images to Stack", "name=name title=[] use keep");
+		run("Make Montage...", "columns=" + channelToProcessCount + " rows=1 scale=0.5 first=1 last="+ channelToProcessCount +" increment=1 border=1 font=12");
+		saveAs("Tiff", outputFileName + "_Montage.tif");
+	}
 
 	// Close opened images
 	while (nImages() > 0 ){ 		
