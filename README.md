@@ -11,7 +11,7 @@ Here is the result of processing a single *.czi file and putting the 4 channels 
 
 # How to use ?
 
-- Download `Mageek.ijm`
+- Download `Mageek.ijm` last release from [here](https://github.com/berdal84/Mageek/releases).
 
 - Download and install Fiji from https://imagej.net/Fiji/Downloads
 
