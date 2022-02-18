@@ -26,19 +26,24 @@ SCRIPT_VERSION          = "0.3.0";
 SCRIPT_SHORT_DESCRIPTION= SCRIPT_TITLE + " is an ImageJ Macro to combine channels from different slices and to colorize them.\nIt works with multiple images/series/channels/slices.";
 ENABLE_PAUSE            = true;        // set to false to disable all pause() calls.
 ANALYSED_SUBFOLDER_NAME = "ANALYSED";  // will be created if not exists.
-FILE_EXTENSION          = ".czi";      // the script will only consider this extension.
 EXT_FOUND_NAME_PREFIX   = "EXT_FOUND_";
 ENABLE_TUTORIAL_BY_DEFAULT = false;
+ANY_EXTENSION           = "*";
+Z_PROJECT_NONE          = "None";
+Z_PROJECT_MODES         = newArray( "Max Intensity", "Average Intensity", "Sum Slices", "Min Intensity"
+                                    , "Standard Deviation", "Median", Z_PROJECT_NONE);
+PRETTY_SEPARATOR        = " - ";
 
 /*
  * File extension presets
  */
-List.set( "Recommended", "*.czi" );     
-List.set( "Legacy", "*.czi" );
-List.set( "Any", "*.*" );
-List.set( "Custom", "" );
-// List.set( "NewPreset", "" ); <----------------------------------------- Feel free to add any extension you want,
-EXT_PRESETS = newArray( "Recommended", "Legacy", "Any", "Custom"); // <--- and don't forget to its name here.
+List.clear();
+List.set( "Recommended", "czi, lif, nd2" );     
+List.set( "_Legacy", ".czi" );
+List.set( "_Any", ANY_EXTENSION );
+List.set( "_Custom", "" );
+// List.set( "NewPreset", "" ); <-- Feel free to add any extension you want.
+EXT_PRESETS = List.getList();
 
 /*
  * Color presets
@@ -48,15 +53,26 @@ EXT_PRESETS = newArray( "Recommended", "Legacy", "Any", "Custom"); // <--- and d
  * Q: How to add a new one ?
  * A: Copy an existing preset and replace the name and the colors (they must be separated by a space).
  */
-List.set( "Confocal", "Magenta Red Green Blue" );
-List.set( "Legacy",   "Blue Green Red Magenta" );
+List.clear();
+List.set( "Confocal", "Magenta, Red, Green, Blue" );
+List.set( "Legacy",   "Blue, Green, Red, Magenta" );
 // List.set( "my preset", "Red Magenta Green Blue" ); <-- Feel free to add any preset you want,
-COLOR_PRESETS = newArray( "Confocal", "Legacy"); // <---- and don't forget to its name here.
+COLOR_PRESETS = List.getList();
 
 /* Colors */
 PRESET_COLOR_FALLBACK = "..."; // this will identify that user want's to use the color preset, this will be replaced.
                                // Though the text will be visible in drop down list.
 COLORS = newArray( PRESET_COLOR_FALLBACK, "Blue", "Green", "Red", "Magenta" ); // Colors available through the color drop down list.
+
+/**
+ * 0 - Prepare environment vars
+ * ============================
+ */
+
+g_scannedFiles = newArray(0);
+g_filteredFiles = newArray(0);
+g_ignoredFiles = newArray(0);
+g_processedFilesCount = 0;
 
 /**
  * 1 - Create a startup dialog to explain to the user the following steps.
@@ -90,13 +106,13 @@ if ( File.exists(destinationDirectory) == false ) {
 
 // Get recursively all the files (in subfolders too)
 print( "Scanning for files ...");
-allFiles = getFileListRecursively(sourceDirectory, ANALYSED_SUBFOLDER_NAME);
-allFileExtensions = getFileExtensions(allFiles, true);
+g_scannedFiles = getFileListRecursively(sourceDirectory, ANALYSED_SUBFOLDER_NAME);
+allFileExtensions = getFileExtensions(g_scannedFiles, true);
 print( "Scan DONE");
 print( "Scan result:");
-print( " - " + allFiles.length + " file(s)");
+print( " - " + g_scannedFiles.length + " file(s)");
 print( " - " + allFileExtensions.length + " extension(s)");
-Array.print(allFiles);
+Array.print(g_scannedFiles);
 Array.print(allFileExtensions);
 
 /** 
@@ -104,7 +120,7 @@ Array.print(allFileExtensions);
  * ====================================
  */  
 Dialog.createNonBlocking("Process settings");
-Dialog.addMessage("Mageek found " + allFiles.length + " file(s) with " + allFileExtensions.length + " extension(s) in " + sourceDirectory);
+Dialog.addMessage("Mageek found " + g_scannedFiles.length + " file(s) with " + allFileExtensions.length + " extension(s) in " + sourceDirectory);
 Dialog.addMessage(" (a detailed list is available in the Log window)");
 Dialog.addMessage("");
 Dialog.addMessage("Please check the settings bellow before to launch the process");
@@ -113,23 +129,20 @@ Dialog.addMessage("");
 /*
  * 3.1 - Ask which type of file to process (using presets) 
  */
-Dialog.addChoice("Extension Preset", EXT_PRESETS);
+prettyExtPresets = makePrettyArray( EXT_PRESETS );
+Dialog.addChoice("Extensions", prettyExtPresets );
 Dialog.addMessage("");
+
 /*
  * 3.2 - Ask the Z Project mode and also if we run the macro in batch (in background) or not
  *    (really usefull to check if script works great before to run it in batch)
  */
-Zchoice = newArray(
-	"Max_Intensity",
-	"Average_Intensity",
-	"Sum_Slices",
-	"Min_Intensity",
-	"Standard_Deviation",
-	"Median",
-	"none");
-Dialog.addChoice("Z Project", Zchoice);
+Dialog.addChoice("Z Project", Z_PROJECT_MODES);
 Dialog.addMessage("");
-Dialog.addChoice("Color preset", COLOR_PRESETS, COLOR_PRESETS[0] );
+
+prettyColorPresets = makePrettyArray( COLOR_PRESETS );
+Dialog.addChoice("Color preset", prettyColorPresets, prettyColorPresets[0] );
+
 Dialog.addMessage("Overrides:");
 Dialog.addChoice("  Channel 1", COLORS, PRESET_COLOR_FALLBACK );
 Dialog.addChoice("  Channel 2", COLORS, PRESET_COLOR_FALLBACK );
@@ -142,9 +155,9 @@ Dialog.addMessage("Process the images files?");
 Dialog.show();
 
 // Apply the choices
-extChoice        = Dialog.getChoice();
+extensionPresetChoice = Dialog.getChoice();
 zProjUserChoice  = Dialog.getChoice();
-presetUserChoice = Dialog.getChoice();
+colorPresetUserChoice = Dialog.getChoice();
 colorsUserChoice = newArray(
 	Dialog.getChoice(),
 	Dialog.getChoice(),
@@ -152,37 +165,48 @@ colorsUserChoice = newArray(
 	Dialog.getChoice()
 );
 
-// TODO: Filter files
-filteredFiles = allFiles;
+// Filter files depending on Extension Preset
+selectedExtensionPreset = getPresetArray(extensionPresetChoice, EXT_PRESETS);
+g_filteredFiles = filterFilesByExtension( g_scannedFiles, selectedExtensionPreset );
 
 // apply the preset colors for each color except if user set something different
-colorsAsString = List.get(presetUserChoice);
-colorsPreset = split( colorsAsString, " ");
+selectedColorPreset = getPresetArray(colorPresetUserChoice, COLOR_PRESETS);
 for (colorIndex = 0; colorIndex < colorsUserChoice.length; colorIndex++)
 {
 	if ( colorsUserChoice[colorIndex] == PRESET_COLOR_FALLBACK )
 	{
-		colorsUserChoice[colorIndex] = colorsPreset[colorIndex];
+		colorsUserChoice[colorIndex] = selectedColorPreset[colorIndex];
 	}
 }
 print( "Before user overrides, the selected preset colors are:");
-Array.print( colorsPreset );
+Array.print( selectedColorPreset );
 print( "After user overrides:");
 Array.print( colorsUserChoice );
-
+print("The filtered extensions are:");
+Array.print( selectedExtensionPreset );
 // batch mode on/off
 batchModeUserChoice = Dialog.getCheckbox();
 setBatchMode(batchModeUserChoice);
+
+// Check if at least one file has been filtered
+if ( g_filteredFiles.length == 0) {
+	message = "Sorry, no files to process... \n";
+	message += "Are you certain " + sourceDirectory + " contains files matching with the selected filter? \n";
+	message += "Your choice was: \""+ extensionPresetChoice + "\"\n";
+	message += SCRIPT_TITLE + " only found " + arraytoString(allFileExtensions, ", ") + ".";
+	displayStats(message);
+	exit();
+}
 
 /**
  * 4 - Iterate on each files from list (source directoy)
  */
 print("\nStart processing files..."); 
-imageProcessedCount = 0;
-for (fileIndex = 0; fileIndex < filteredFiles.length; fileIndex++)
+g_processedFilesCount = 0;
+for (fileIndex = 0; fileIndex < g_filteredFiles.length; fileIndex++)
 {
-	eachFilePath = filteredFiles[fileIndex];
-	imageProcessedCount++;
+	eachFilePath = g_filteredFiles[fileIndex];
+	g_processedFilesCount++;
 
 	// Open the file
 	run("Bio-Formats Importer", "open='" + eachFilePath + "' autoscale=false view=Hyperstack");
@@ -197,19 +221,7 @@ for (fileIndex = 0; fileIndex < filteredFiles.length; fileIndex++)
 /**
  * Displays a end message and wait the user to press OK.
  */
-title = "End of process";
-msg   = 
-
-Dialog.create("End of process");
-Dialog.addMessage("Image processing done !");
-Dialog.addMessage("");
-Dialog.addMessage("Quick resume:");
-Dialog.addMessage(" - Files found : " + allFiles.length);
-Dialog.addMessage(" - Files processed : " + imageProcessedCount + "/" + allFiles.length);
-Dialog.addMessage(" - Files ignored : " + ignoredFiles.length+ "/" + allFiles.length);
-Dialog.addMessage("");
-Dialog.addMessage("Hasta La Vista Baby. ^^");
-Dialog.show();
+displayStats("Process complete!");
 
 /**
  * Unified function to colorize an image with N channels, with N in [1,4].
@@ -234,15 +246,20 @@ function Colorize(eachFilePath, _colorForChannel)
 	// Stack.setDisplayMode("color");
 
 	// Colorize each channels using specified color (_colorForChannel is an Array of strings)
+
 	for( i=0; i < channelToProcessCount; i++) {
-		Stack.setChannel(i+1);
+		if( channelToProcessCount > 1 ) { 
+			Stack.setChannel(i+1);
+		}
 		colorScriptName = _colorForChannel[i];
 		print("Colorizing channel ", i+1, " as ", colorScriptName, "...");
 		run(colorScriptName);
 	}
 
 	if( frames > 1 || slices > 1) { 
-		RunZProject();
+		if (zProjUserChoice != Z_PROJECT_NONE ){
+			run("Z Project...", "projection=["+ zProjUserChoice +"]");	
+		}
 		selectImage(1);
 		close();
 	}
@@ -287,32 +304,6 @@ function Colorize(eachFilePath, _colorForChannel)
 		close(); 
 	}
 }
-
-function RunZProject(){
-	
-	if (zProjUserChoice == "Sum_Slices"){
-		run("Z Project...", "projection=[Sum Slices]");
-		
-	} else if (zProjUserChoice == "Average_Intensity"){
-		run("Z Project...", "projection=[Average Intensity]");
-		
-	} else if (zProjUserChoice == "Max_Intensity"){
-		run("Z Project...", "projection=[Max Intensity]");
-		
-	} else if (zProjUserChoice == "Min_Intensity"){
-		run("Z Project...", "projection=[Min Intensity]");
-		
-	} else if (zProjUserChoice == "Standard_Deviation"){
-		run("Z Project...", "projection=[Standard Deviation]");
-		
-	} else if (zProjUserChoice == "Median"){
-		run("Z Project...", "projection=Median");
-		
-	} else if (zProjUserChoice=="none"){
-		
-	}
-}
-
 
 function getFileListRecursively(dir, _ignoreFolderName) {	
 	files = listFiles(dir, _ignoreFolderName);
@@ -406,14 +397,23 @@ function getFileExtensions(_files, _ignoreNoExt) {
  */
 function getExtension(path){
 
+	print("getting extension for " + path );
+
+	result = "";
 	if ( File.isDirectory(path))
 		exit("Mageek's getExtension(path) shall not be called using a directory path, check before use.");
 
-	_arr = split(File.getName(path),  ".");
-	if ( _arr.length == 1){
-		return "";
+	arr = split(File.getName(path),  ".");
+	if ( arr.length == 1){
+		result = "";
+	} else {
+		result = arr[1];
 	}
-	return "*."+_arr[1];
+
+	print(" -> result: " + result );
+
+
+	return result;
 }
 
 function openStartupDialog(_tutorial){
@@ -456,4 +456,85 @@ function openHelpDialog(){
 	Dialog.addMessage("Hope you understand a bit more, let's click on OK to continue.");
 	Dialog.addMessage("");
 	Dialog.show();
+}
+
+function cleanExtension( _ext ){
+	_ext = replace(_ext," ", "");
+	return _ext;
+}
+
+function filterFilesByExtension( _files, _extensions){
+	g_ignoredFiles = newArray(0);
+	print("Filtering files using the extension bellow ...");
+	Array.print(_extensions);
+	print("");
+
+	_result = newArray(0);
+	for (fileIndex = 0; fileIndex < _files.length; fileIndex++) {
+		_file = _files[fileIndex];
+		_ext = getExtension(_file);
+		_keep_file = false;
+		
+		print("File extension is \"" + _ext + "\"");
+		for (extIndex = 0; (extIndex < _extensions.length); extIndex++) {
+			eachAllowedExt = cleanExtension(_extensions[extIndex]);
+			print("Confronting with allowed \"" + eachAllowedExt + "\"");
+
+			if ( _ext == eachAllowedExt || eachAllowedExt == ANY_EXTENSION ) {
+				_keep_file = true;
+				print(" match.");
+			}else{
+				print(" do NOT match.");
+			}			
+		}
+		if ( _keep_file ){
+			_result = Array.concat(_result, _file);
+		}else{
+			g_ignoredFiles = Array.concat(g_ignoredFiles, _file);
+			print("Discarding file " + _file + ", because extension "+_ext+" is not allowed.");		
+		}
+	}
+	print("Filtering files DONE");
+	return _result;
+}
+
+function makePrettyArray( list ) {
+	result = split(list, "\n");
+	for(i=0; i<result.length; i++){
+		result[i] = replace(result[i], "=", PRETTY_SEPARATOR + "(" ) + ")";
+	}
+	return result;
+}
+
+function getPresetArray(prettyItem, list) {	
+	splitted = split(prettyItem, PRETTY_SEPARATOR);
+	key = replace(splitted[0], " ", "");
+	List.setList(list);
+	presetString = List.get(key);
+	return split(presetString, ",");
+}
+
+function displayStats( message ){
+	Dialog.create("End of process");
+	Dialog.addMessage(message);
+	Dialog.addMessage("");
+	Dialog.addMessage("Quick resume:");
+	Dialog.addMessage(" - scanned : "   + g_scannedFiles.length);
+	Dialog.addMessage(" - ignored : "   + g_ignoredFiles.length   + "/" + g_scannedFiles.length);
+	Dialog.addMessage(" - filtered : "  + g_filteredFiles.length  + "/" + g_scannedFiles.length);
+	Dialog.addMessage(" - processed : " + g_processedFilesCount   + "/" + g_filteredFiles.length);
+	Dialog.addMessage("");
+	Dialog.addMessage("Hasta La Vista Baby. ^^");
+	Dialog.show();
+}
+
+function arraytoString( arr , separator) {
+	result = "";
+	for(i = 0; i<arr.length; i++){
+		if ( i != 0 ){
+			result += separator;
+		}
+		result += arr[i];		
+	}
+	return result;
 }
