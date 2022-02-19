@@ -122,26 +122,29 @@ Array.print(allFileExtensions);
 Dialog.createNonBlocking("Process settings");
 Dialog.addMessage("Mageek found " + g_scannedFiles.length + " file(s) with " + allFileExtensions.length + " extension(s) in " + sourceDirectory);
 Dialog.addMessage(" (a detailed list is available in the Log window)");
-Dialog.addMessage("");
-Dialog.addMessage("Please check the settings bellow before to launch the process");
-Dialog.addMessage("");
+Dialog.addMessage("\nPlease check the settings bellow before to launch the process");
 
 /*
  * 3.1 - Ask which type of file to process (using presets) 
  */
+Dialog.addMessage("File extensions:");
 prettyExtPresets = makePrettyArray( EXT_PRESETS );
-Dialog.addChoice("Extensions", prettyExtPresets );
-Dialog.addMessage("");
+Dialog.addChoice("Preset", prettyExtPresets );
+
+Dialog.addMessage("Overrides:");
+for(i=0; i<allFileExtensions.length;i++){
+	Dialog.addCheckbox( allFileExtensions[i] + " - x file(s)", false );
+}
 
 /*
  * 3.2 - Ask the Z Project mode and also if we run the macro in batch (in background) or not
  *    (really usefull to check if script works great before to run it in batch)
  */
-Dialog.addChoice("Z Project", Z_PROJECT_MODES);
-Dialog.addMessage("");
+Dialog.addChoice("\nZ Project", Z_PROJECT_MODES);
 
 prettyColorPresets = makePrettyArray( COLOR_PRESETS );
-Dialog.addChoice("Color preset", prettyColorPresets, prettyColorPresets[0] );
+Dialog.addMessage("\nChannel colors:");
+Dialog.addChoice("Preset", prettyColorPresets, prettyColorPresets[0] );
 
 Dialog.addMessage("Overrides:");
 Dialog.addChoice("  Channel 1", COLORS, PRESET_COLOR_FALLBACK );
@@ -156,6 +159,10 @@ Dialog.show();
 
 // Apply the choices
 extensionPresetChoice = Dialog.getChoice();
+extensionUserChoice = newArray(allFileExtensions.length);
+for(i=0; i<allFileExtensions.length;i++){
+	extensionUserChoice[i] = Dialog.getCheckbox();
+}
 zProjUserChoice  = Dialog.getChoice();
 colorPresetUserChoice = Dialog.getChoice();
 colorsUserChoice = newArray(
@@ -166,8 +173,8 @@ colorsUserChoice = newArray(
 );
 
 // Filter files depending on Extension Preset
-selectedExtensionPreset = getPresetArray(extensionPresetChoice, EXT_PRESETS);
-g_filteredFiles = filterFilesByExtension( g_scannedFiles, selectedExtensionPreset );
+//selectedExtensionPreset = getPresetArray(extensionPresetChoice, EXT_PRESETS);
+g_filteredFiles = filterFilesByExtension( g_scannedFiles, extensionUserChoice );
 
 // apply the preset colors for each color except if user set something different
 selectedColorPreset = getPresetArray(colorPresetUserChoice, COLOR_PRESETS);
@@ -183,7 +190,7 @@ Array.print( selectedColorPreset );
 print( "After user overrides:");
 Array.print( colorsUserChoice );
 print("The filtered extensions are:");
-Array.print( selectedExtensionPreset );
+Array.print( extensionUserChoice );
 // batch mode on/off
 batchModeUserChoice = Dialog.getCheckbox();
 setBatchMode(batchModeUserChoice);
@@ -192,7 +199,7 @@ setBatchMode(batchModeUserChoice);
 if ( g_filteredFiles.length == 0) {
 	message = "Sorry, no files to process... \n";
 	message += "Are you certain " + sourceDirectory + " contains files matching with the selected filter? \n";
-	message += "Your choice was: \""+ extensionPresetChoice + "\"\n";
+	message += "Your choice was: "+ arraytoString(extensionUserChoice, ", ") + "\n";
 	message += SCRIPT_TITLE + " only found " + arraytoString(allFileExtensions, ", ") + ".";
 	displayStats(message);
 	exit();
