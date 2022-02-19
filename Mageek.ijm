@@ -24,26 +24,16 @@
 SCRIPT_TITLE            = "MAGEEK";
 SCRIPT_VERSION          = "0.3.0";
 SCRIPT_SHORT_DESCRIPTION= SCRIPT_TITLE + " is an ImageJ Macro to combine channels from different slices and to colorize them.\nIt works with multiple images/series/channels/slices.";
-ENABLE_PAUSE            = true;        // set to false to disable all pause() calls.
-ANALYSED_SUBFOLDER_NAME = "ANALYSED";  // will be created if not exists.
-EXT_FOUND_NAME_PREFIX   = "EXT_FOUND_";
-ENABLE_TUTORIAL_BY_DEFAULT = false;
+AUTO_CHECKED_EXTENSIONS = newArray("czi", "lif", "nd2");
 ANY_EXTENSION           = "*";
 Z_PROJECT_NONE          = "None";
 Z_PROJECT_MODES         = newArray( "Max Intensity", "Average Intensity", "Sum Slices", "Min Intensity"
                                     , "Standard Deviation", "Median", Z_PROJECT_NONE);
-PRETTY_SEPARATOR        = " - ";
-
-/*
- * File extension presets
- */
-List.clear();
-List.set( "Recommended", "czi, lif, nd2" );     
-List.set( "_Legacy", ".czi" );
-List.set( "_Any", ANY_EXTENSION );
-List.set( "_Custom", "" );
-// List.set( "NewPreset", "" ); <-- Feel free to add any extension you want.
-EXT_PRESETS = List.getList();
+ENABLE_PAUSE            = true;        // set to false to disable all pause() calls.
+ANALYSED_SUBFOLDER_NAME = "ANALYSED";  // will be created if not exists.
+EXT_FOUND_NAME_PREFIX   = "EXT_FOUND_";
+ENABLE_TUTORIAL_BY_DEFAULT = false;
+PRETTY_SEPARATOR        = " - ";  
 
 /*
  * Color presets
@@ -128,13 +118,14 @@ Dialog.addMessage("\nPlease check the settings bellow before to launch the proce
  * 3.1 - Ask which type of file to process (using presets) 
  */
 Dialog.addMessage("File extensions:");
-prettyExtPresets = makePrettyArray( EXT_PRESETS );
-Dialog.addChoice("Preset", prettyExtPresets );
-
-Dialog.addMessage("Overrides:");
-for(i=0; i<allFileExtensions.length;i++){
-	Dialog.addCheckbox( allFileExtensions[i] + " - x file(s)", false );
+Dialog.setInsets(0, 50, 0);
+for(i=0; i<allFileExtensions.length;i++)
+{	
+	eachExtension = allFileExtensions[i];
+	defaultValue  = arrayContains( AUTO_CHECKED_EXTENSIONS, eachExtension );
+	Dialog.addCheckbox( eachExtension + " - x file(s)", defaultValue );
 }
+Dialog.setInsets(0, 0, 0);
 
 /*
  * 3.2 - Ask the Z Project mode and also if we run the macro in batch (in background) or not
@@ -145,12 +136,11 @@ Dialog.addChoice("\nZ Project", Z_PROJECT_MODES);
 prettyColorPresets = makePrettyArray( COLOR_PRESETS );
 Dialog.addMessage("\nChannel colors:");
 Dialog.addChoice("Preset", prettyColorPresets, prettyColorPresets[0] );
-
 Dialog.addMessage("Overrides:");
-Dialog.addChoice("  Channel 1", COLORS, PRESET_COLOR_FALLBACK );
-Dialog.addChoice("  Channel 2", COLORS, PRESET_COLOR_FALLBACK );
-Dialog.addChoice("  Channel 3", COLORS, PRESET_COLOR_FALLBACK );
-Dialog.addChoice("  Channel 4", COLORS, PRESET_COLOR_FALLBACK );
+for(i=1; i <= 4; i++)
+{
+	Dialog.addChoice("Channel " + i, COLORS, PRESET_COLOR_FALLBACK );
+}
 Dialog.addMessage("");
 Dialog.addCheckbox("batch (process in background)", true);
 Dialog.addMessage("");
@@ -158,10 +148,12 @@ Dialog.addMessage("Process the images files?");
 Dialog.show();
 
 // Apply the choices
-extensionPresetChoice = Dialog.getChoice();
-extensionUserChoice = newArray(allFileExtensions.length);
+extensionUserChoice = newArray(0);
 for(i=0; i<allFileExtensions.length;i++){
-	extensionUserChoice[i] = Dialog.getCheckbox();
+	if ( Dialog.getCheckbox() ){
+		eachExtension = allFileExtensions[i];
+		extensionUserChoice = Array.concat( extensionUserChoice, eachExtension );
+	}
 }
 zProjUserChoice  = Dialog.getChoice();
 colorPresetUserChoice = Dialog.getChoice();
@@ -238,10 +230,10 @@ displayStats("Process complete!");
  * for example, if _colorForChannel = ["Magenta", "Blue"] it will work because run("Magenta") and run("Blue") exists in Fiji.
  * 
  */
-function Colorize(eachFilePath, _colorForChannel)
+function Colorize(_filePath, _colorForChannel)
 {	
 	// Print some information in logs
-	print("Colorize... ", eachFilePath);
+	print("Colorize... ", _filePath);
 	print("     [", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
 	
 	channelToProcessCount = channels;	
@@ -542,6 +534,17 @@ function arraytoString( arr , separator) {
 			result += separator;
 		}
 		result += arr[i];		
+	}
+	return result;
+}
+
+function arrayContains( arr, item)
+{
+	result = false;
+	for( i=0; (i < arr.length) && result == false; i++ )
+	{
+		if ( arr[i] == item )
+			result = true;
 	}
 	return result;
 }
