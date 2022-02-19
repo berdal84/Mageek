@@ -34,6 +34,7 @@ ANALYSED_SUBFOLDER_NAME = "ANALYSED";  // will be created if not exists.
 EXT_FOUND_NAME_PREFIX   = "EXT_FOUND_";
 ENABLE_TUTORIAL_BY_DEFAULT = false;
 PRETTY_SEPARATOR        = " - ";  
+ENABLE_BATCH_PROCESSING_DEFAULT = true;
 
 /*
  * Color presets
@@ -62,6 +63,7 @@ COLORS = newArray( PRESET_COLOR_FALLBACK, "Blue", "Green", "Red", "Magenta" ); /
 g_scannedFiles = newArray(0);
 g_filteredFiles = newArray(0);
 g_ignoredFiles = newArray(0);
+g_fileCountPerExtension = newArray(0);
 g_processedFilesCount = 0;
 
 /**
@@ -123,7 +125,7 @@ for(i=0; i<allFileExtensions.length;i++)
 {	
 	eachExtension = allFileExtensions[i];
 	defaultValue  = arrayContains( AUTO_CHECKED_EXTENSIONS, eachExtension );
-	Dialog.addCheckbox( eachExtension + " - x file(s)", defaultValue );
+	Dialog.addCheckbox( "*." + eachExtension , defaultValue );
 }
 Dialog.setInsets(0, 0, 0);
 
@@ -131,18 +133,42 @@ Dialog.setInsets(0, 0, 0);
  * 3.2 - Ask the Z Project mode and also if we run the macro in batch (in background) or not
  *    (really usefull to check if script works great before to run it in batch)
  */
+if ( isTutorialEnable )
+{
+	Dialog.addMessage("In case image processed has multiple slices, select the way to project them:");
+}
 Dialog.addChoice("\nZ Project", Z_PROJECT_MODES);
 
 prettyColorPresets = makePrettyArray( COLOR_PRESETS );
 Dialog.addMessage("\nChannel colors:");
 Dialog.addChoice("Preset", prettyColorPresets, prettyColorPresets[0] );
-Dialog.addMessage("Overrides:");
+
+
+if ( isTutorialEnable )
+{
+	Dialog.addMessage("Overrides:\n\t(change \"" + PRESET_COLOR_FALLBACK + "\" to any color to override a color for a specific channel)");
+}
+else
+{
+	Dialog.addMessage("Overrides:");;
+}
+
 for(i=1; i <= 4; i++)
 {
 	Dialog.addChoice("Channel " + i, COLORS, PRESET_COLOR_FALLBACK );
 }
 Dialog.addMessage("");
-Dialog.addCheckbox("batch (process in background)", true);
+
+if ( isTutorialEnable )
+{
+	Dialog.addCheckbox("batch (will process in background)", ENABLE_BATCH_PROCESSING_DEFAULT);
+}
+else
+{
+	Dialog.addCheckbox("batch", ENABLE_BATCH_PROCESSING_DEFAULT );
+}
+
+
 Dialog.addMessage("");
 Dialog.addMessage("Process the images files?");
 Dialog.show();
@@ -520,7 +546,7 @@ function displayStats( message ){
 	Dialog.addMessage("Quick resume:");
 	Dialog.addMessage(" - scanned : "   + g_scannedFiles.length);
 	Dialog.addMessage(" - ignored : "   + g_ignoredFiles.length   + "/" + g_scannedFiles.length);
-	Dialog.addMessage(" - filtered : "  + g_filteredFiles.length  + "/" + g_scannedFiles.length);
+	// Dialog.addMessage(" - filtered : "  + g_filteredFiles.length  + "/" + g_scannedFiles.length);
 	Dialog.addMessage(" - processed : " + g_processedFilesCount   + "/" + g_filteredFiles.length);
 	Dialog.addMessage("");
 	Dialog.addMessage("Hasta La Vista Baby. ^^");
