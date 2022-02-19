@@ -45,8 +45,8 @@ ENABLE_BATCH_PROCESSING_DEFAULT = true;
  * A: Copy an existing preset and replace the name and the colors (they must be separated by a space).
  */
 List.clear();
-List.set( "Confocal", "Magenta, Red, Green, Blue" );
-List.set( "Legacy",   "Blue, Green, Red, Magenta" );
+List.set( "Confocal", replace("Magenta, Red, Green, Blue", " ", "" ));
+List.set( "Legacy",   replace("Blue, Green, Red, Magenta", " ", "" ));
 // List.set( "my preset", "Red Magenta Green Blue" ); <-- Feel free to add any preset you want,
 COLOR_PRESETS = List.getList();
 
@@ -234,10 +234,23 @@ for (fileIndex = 0; fileIndex < g_filteredFiles.length; fileIndex++)
 	g_processedFilesCount++;
 
 	// Open the file
-	run("Bio-Formats Importer", "open='" + eachFilePath + "' autoscale=false view=Hyperstack");
-	name = File.nameWithoutExtension;	
-	getDimensions(width, height, channels, slices, frames);	
-	Colorize(eachFilePath, colorsUserChoice );
+	run("Bio-Formats Importer", "open='" + eachFilePath + "' open_all_series autoscale=false view=Hyperstack");
+	
+	print("Colorize... ", eachFilePath);
+
+	// for each serie
+	serie = 0;
+	while (nImages() > 0 )
+	{		
+		selectImage(nImages);
+		name = File.nameWithoutExtension;	
+		getDimensions(width, height, channels, slices, frames);
+		Colorize( serie, colorsUserChoice, channels, slices, frames );
+		selectImage(nImages);
+		close();
+		serie++;
+	}
+	
 	
 	print("    DONE ! ");
 	
@@ -256,12 +269,10 @@ displayStats("Process complete!");
  * for example, if _colorForChannel = ["Magenta", "Blue"] it will work because run("Magenta") and run("Blue") exists in Fiji.
  * 
  */
-function Colorize(_filePath, _colorForChannel)
+function Colorize( _serie, _colorForChannel, channels, slices, frames )
 {	
-	// Print some information in logs
-	print("Colorize... ", _filePath);
-	print("     [", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
-	
+	print("Colorize... [ serie ", _serie, ", ", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
+	existingFileCount = nImages();
 	channelToProcessCount = channels;	
 	// in some cases we could have more channels than colors, so we skip the channels without color
 	if ( channelToProcessCount  > _colorForChannel.length ) {
@@ -285,7 +296,7 @@ function Colorize(_filePath, _colorForChannel)
 		if (zProjUserChoice != Z_PROJECT_NONE ){
 			run("Z Project...", "projection=["+ zProjUserChoice +"]");	
 		}
-		selectImage(1);
+		selectImage(existingFileCount);
 		close();
 	}
 	
@@ -296,7 +307,7 @@ function Colorize(_filePath, _colorForChannel)
 	
 	// Rename the channel(s) image(s)
 	for( i=0; i < channelToProcessCount; i++) {
-		selectImage(i+1);
+		selectImage(existingFileCount+i);
 		rename(_colorForChannel[i]);
 	}
 
@@ -313,7 +324,7 @@ function Colorize(_filePath, _colorForChannel)
 	for( i=0; i < channelToProcessCount; i++) {
 		selectWindow(_colorForChannel[i]);
 		run("RGB Color");
-		saveAs("Tiff", outputFileName + "_" + _colorForChannel[i] + ".tif");
+		saveAs("Tiff", outputFileName + "_serie_" + _serie + "_color_" + _colorForChannel[i] + ".tif");
 	}
 
 	// Create a Montage with colored channels (only if we have more than one channel)
@@ -324,7 +335,7 @@ function Colorize(_filePath, _colorForChannel)
 	}
 
 	// Close opened images
-	while (nImages() > 0 ){ 		
+	while (nImages() > existingFileCount ){ 		
 		selectImage(nImages); 
 		close(); 
 	}
