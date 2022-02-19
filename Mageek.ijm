@@ -226,7 +226,7 @@ if ( g_filteredFiles.length == 0) {
 /**
  * 4 - Iterate on each files from list (source directoy)
  */
-print("\nStart processing files..."); 
+print("\nStart processing all files ..."); 
 g_processedFilesCount = 0;
 for (fileIndex = 0; fileIndex < g_filteredFiles.length; fileIndex++)
 {
@@ -236,25 +236,24 @@ for (fileIndex = 0; fileIndex < g_filteredFiles.length; fileIndex++)
 	// Open the file
 	run("Bio-Formats Importer", "open='" + eachFilePath + "' open_all_series autoscale=false view=Hyperstack");
 	
-	print("Colorize... ", eachFilePath);
+	print("Processing ", eachFilePath, " ...");
 
 	// for each serie
-	serie = 0;
+	
 	while (nImages() > 0 )
 	{		
-		selectImage(nImages);
-		name = File.nameWithoutExtension;	
+		serie_num = nImages(); // series are open in order: 1, 2, 3, etc., so the nb of image is the last serie_num
+		selectImage(serie_num);
 		getDimensions(width, height, channels, slices, frames);
-		Colorize( serie, colorsUserChoice, channels, slices, frames );
-		selectImage(nImages);
+		outputFileName = destinationDirectory + File.separator + File.nameWithoutExtension + "_serie_" + serie_num;
+		Colorize( outputFileName, colorsUserChoice, channels, slices, frames );
+		selectImage(serie_num);
 		close();
-		serie++;
 	}
 	
-	
-	print("    DONE ! ");
-	
+	print("Processing ", eachFilePath, " DONE");	
 }
+print("\Processing all files DONE"); 
 
 /**
  * Displays a end message and wait the user to press OK.
@@ -269,9 +268,9 @@ displayStats("Process complete!");
  * for example, if _colorForChannel = ["Magenta", "Blue"] it will work because run("Magenta") and run("Blue") exists in Fiji.
  * 
  */
-function Colorize( _serie, _colorForChannel, channels, slices, frames )
+function Colorize( _outputFileName, _colorForChannel, channels, slices, frames )
 {	
-	print("Colorize... [ serie ", _serie, ", ", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
+	print("Colorize... ", _outputFileName , "[ ", channels, " channel(s), ", slices, " slice(s), ", frames, " frame(s) ]");	
 	existingFileCount = nImages();
 	channelToProcessCount = channels;	
 	// in some cases we could have more channels than colors, so we skip the channels without color
@@ -320,18 +319,17 @@ function Colorize( _serie, _colorForChannel, channels, slices, frames )
 	*/
 	
 	// Save each image
-	outputFileName = destinationDirectory + File.separator + name;
 	for( i=0; i < channelToProcessCount; i++) {
 		selectWindow(_colorForChannel[i]);
 		run("RGB Color");
-		saveAs("Tiff", outputFileName + "_serie_" + _serie + "_color_" + _colorForChannel[i] + ".tif");
+		saveAs("Tiff", _outputFileName + "_color_" + _colorForChannel[i] + ".tif");
 	}
 
 	// Create a Montage with colored channels (only if we have more than one channel)
 	if ( channelToProcessCount > 1 ) {
 		run("Images to Stack", "name=name title=[] use keep");
 		run("Make Montage...", "columns=" + channelToProcessCount + " rows=1 scale=0.5 first=1 last="+ channelToProcessCount +" increment=1 border=1 font=12");
-		saveAs("Tiff", outputFileName + "_Montage.tif");
+		saveAs("Tiff", _outputFileName + "_Montage.tif");
 	}
 
 	// Close opened images
@@ -556,8 +554,8 @@ function displayStats( message ){
 	Dialog.addMessage("");
 	Dialog.addMessage("Quick resume:");
 	Dialog.addMessage(" - scanned : "   + g_scannedFiles.length);
-	Dialog.addMessage(" - ignored : "   + g_scannedFiles.length-g_filteredFiles.length   + "/" + g_scannedFiles.length + " scanned");
-	Dialog.addMessage(" - processed : " + g_processedFilesCount   + "/" + g_scannedFiles.length + " scanned");
+	Dialog.addMessage(" - ignored : "   + g_scannedFiles.length-g_filteredFiles.length);
+	Dialog.addMessage(" - processed : " + g_processedFilesCount);
 	Dialog.addMessage("");
 	Dialog.addMessage("Hasta La Vista Baby. ^^");
 	Dialog.show();
