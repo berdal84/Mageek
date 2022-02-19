@@ -120,14 +120,16 @@ Dialog.addMessage("\nPlease check the settings bellow before to launch the proce
  * 3.1 - Ask which type of file to process (using presets) 
  */
 Dialog.addMessage("File extensions:");
-Dialog.setInsets(0, 50, 0);
+
 for(i=0; i<allFileExtensions.length;i++)
 {	
+	Dialog.setInsets(0, 50, 0);
 	eachExtension = allFileExtensions[i];
 	defaultValue  = arrayContains( AUTO_CHECKED_EXTENSIONS, eachExtension );
 	Dialog.addCheckbox( "*." + eachExtension , defaultValue );
+	Dialog.setInsets(0, 0, 0);
 }
-Dialog.setInsets(0, 0, 0);
+
 
 /*
  * 3.2 - Ask the Z Project mode and also if we run the macro in batch (in background) or not
