@@ -556,9 +556,8 @@ function displayStats( message ){
 	Dialog.addMessage("");
 	Dialog.addMessage("Quick resume:");
 	Dialog.addMessage(" - scanned : "   + g_scannedFiles.length);
-	Dialog.addMessage(" - ignored : "   + g_ignoredFiles.length   + "/" + g_scannedFiles.length);
-	// Dialog.addMessage(" - filtered : "  + g_filteredFiles.length  + "/" + g_scannedFiles.length);
-	Dialog.addMessage(" - processed : " + g_processedFilesCount   + "/" + g_filteredFiles.length);
+	Dialog.addMessage(" - ignored : "   + g_scannedFiles.length-g_filteredFiles.length   + "/" + g_scannedFiles.length + " scanned");
+	Dialog.addMessage(" - processed : " + g_processedFilesCount   + "/" + g_scannedFiles.length + " scanned");
 	Dialog.addMessage("");
 	Dialog.addMessage("Hasta La Vista Baby. ^^");
 	Dialog.show();
